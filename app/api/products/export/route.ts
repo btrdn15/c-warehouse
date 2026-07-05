@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     const buffer = workbookToBuffer(workbook);
     const date = new Date().toISOString().slice(0, 10);
 
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         "Content-Type":
