@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { formatDateLabel, parseMonthValue } from "@/lib/date";
+import DateFields from "@/components/DateFields";
 
 interface ReceiveModalProps {
   count: number;
   onClose: () => void;
-  onSubmit: (receivedBy: string) => void;
+  onSubmit: (receivedBy: string, receivedDate: string) => void;
 }
 
 export default function ReceiveModal({
@@ -13,7 +15,11 @@ export default function ReceiveModal({
   onClose,
   onSubmit,
 }: ReceiveModalProps) {
+  const initial = parseMonthValue("");
   const [name, setName] = useState("");
+  const [year, setYear] = useState(initial.year);
+  const [month, setMonth] = useState(initial.month);
+  const [day, setDay] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -23,8 +29,12 @@ export default function ReceiveModal({
       setError("Нэр оруулна уу");
       return;
     }
+    if (!year || !month) {
+      setError("Он, сарыг сонгоно уу");
+      return;
+    }
     setSubmitting(true);
-    onSubmit(name.trim());
+    onSubmit(name.trim(), formatDateLabel(year, month, day));
   }
 
   return (
@@ -57,7 +67,7 @@ export default function ReceiveModal({
         </div>
 
         <p className="mb-4 text-sm text-gray-500">
-          {count} барааг хэн хүлээн авсан бэ?
+          {count} барааг хэн, хэзээ хүлээн авсан бэ?
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -72,6 +82,20 @@ export default function ReceiveModal({
               placeholder="Таны нэр"
               autoFocus
               className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              Хүлээн авсан огноо (он, сар, өдөр)
+            </label>
+            <DateFields
+              year={year}
+              month={month}
+              day={day}
+              onYearChange={setYear}
+              onMonthChange={setMonth}
+              onDayChange={setDay}
             />
           </div>
 

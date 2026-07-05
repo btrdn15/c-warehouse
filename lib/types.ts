@@ -6,13 +6,17 @@ export type ProductStatus =
 
 export interface Product {
   id: number;
+  product_no: string;
   name: string;
   added_by: string;
   date: string;
   price: string | null;
+  cargo_price: string | null;
   image: string | null;
   status: ProductStatus;
   received_by: string | null;
+  received_date: string | null;
+  arrived_date: string | null;
   created_at: string;
 }
 

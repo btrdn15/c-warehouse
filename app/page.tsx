@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Product, ProductStatus } from "@/lib/types";
 import AddProductModal from "@/components/AddProductModal";
 import ProductList from "@/components/ProductList";
+import SearchBar from "@/components/SearchBar";
 import SelectionToolbar from "@/components/SelectionToolbar";
 import { getDefaultMonthValue } from "@/lib/date";
+import { downloadProductsExcel } from "@/lib/exportProducts";
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -13,6 +15,18 @@ export default function HomePage() {
   const [showModal, setShowModal] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredProducts = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return products;
+
+    return products.filter((product) => {
+      const name = product.name.toLowerCase();
+      const productNo = product.product_no.toLowerCase();
+      return name.includes(query) || productNo.includes(query);
+    });
+  }, [products, searchQuery]);
 
   async function fetchProducts() {
     const res = await fetch("/api/products");
@@ -32,6 +46,22 @@ export default function HomePage() {
     });
   }
 
+  function toggleSelectAll() {
+    setSelectedIds((prev) => {
+      const filteredIds = filteredProducts.map((p) => p.id);
+      const allFilteredSelected =
+        filteredIds.length > 0 && filteredIds.every((id) => prev.has(id));
+
+      if (allFilteredSelected) {
+        const next = new Set(prev);
+        for (const id of filteredIds) next.delete(id);
+        return next;
+      }
+
+      return new Set([...prev, ...filteredIds]);
+    });
+  }
+
   function toggleSelect(id: number) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -46,6 +76,7 @@ export default function HomePage() {
     added_by: string;
     date: string;
     price: string;
+    cargo_price: string;
     image: string | null;
   }) {
     const res = await fetch("/api/products", {
@@ -53,18 +84,24 @@ export default function HomePage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-    if (res.ok) {
-      const product = await res.json();
-      setProducts((prev) => [...prev, product]);
-      setShowModal(false);
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error ?? "Бараа нэмэхэд алдаа гарлаа");
     }
+    const product = await res.json();
+    setProducts((prev) => [...prev, product]);
+    setShowModal(false);
   }
 
-  async function handleStatusChange(id: number, status: ProductStatus) {
+  async function handleStatusChange(
+    id: number,
+    status: ProductStatus,
+    arrivedDate?: string
+  ) {
     const res = await fetch(`/api/products/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, arrived_date: arrivedDate }),
     });
     if (res.ok) {
       const updated = await res.json();
@@ -74,14 +111,17 @@ export default function HomePage() {
     }
   }
 
-  async function handleBulkStatusChange(status: ProductStatus) {
+  async function handleBulkStatusChange(
+    status: ProductStatus,
+    arrivedDate?: string
+  ) {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
 
     const res = await fetch("/api/products/bulk", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids, status }),
+      body: JSON.stringify({ ids, status, arrived_date: arrivedDate }),
     });
 
     if (res.ok) {
@@ -93,14 +133,18 @@ export default function HomePage() {
     }
   }
 
-  async function handleBulkReceive(receivedBy: string) {
+  async function handleBulkReceive(receivedBy: string, receivedDate: string) {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
 
     const res = await fetch("/api/products/receive", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids, received_by: receivedBy }),
+      body: JSON.stringify({
+        ids,
+        received_by: receivedBy,
+        received_date: receivedDate,
+      }),
     });
 
     if (res.ok) {
@@ -110,6 +154,11 @@ export default function HomePage() {
       setSelectedIds(new Set());
       setSelectionMode(false);
     }
+  }
+
+  function handleDownload() {
+    const selected = products.filter((product) => selectedIds.has(product.id));
+    downloadProductsExcel(selected);
   }
 
   return (
@@ -139,20 +188,41 @@ export default function HomePage() {
           </div>
         ) : (
           <>
+            <SearchBar value={searchQuery} onChange={setSearchQuery} />
             <SelectionToolbar
               selectionMode={selectionMode}
               selectedCount={selectedIds.size}
+              totalCount={filteredProducts.length}
+              allSelected={
+                filteredProducts.length > 0 &&
+                filteredProducts.every((p) => selectedIds.has(p.id))
+              }
               onToggleSelectionMode={toggleSelectionMode}
+              onSelectAll={toggleSelectAll}
               onBulkStatusChange={handleBulkStatusChange}
               onBulkReceive={handleBulkReceive}
+              onDownload={handleDownload}
             />
-            <ProductList
-              products={products}
-              selectionMode={selectionMode}
-              selectedIds={selectedIds}
-              onToggleSelect={toggleSelect}
-              onStatusChange={handleStatusChange}
-            />
+            {filteredProducts.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-gray-300 bg-white py-12 text-center">
+                <p className="text-gray-500">Хайлтад тохирох бараа олдсонгүй</p>
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="mt-2 text-sm text-blue-600 hover:text-blue-700"
+                >
+                  Хайлт цэвэрлэх
+                </button>
+              </div>
+            ) : (
+              <ProductList
+                products={filteredProducts}
+                selectionMode={selectionMode}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                onStatusChange={handleStatusChange}
+              />
+            )}
           </>
         )}
       </main>

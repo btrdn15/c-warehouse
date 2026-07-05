@@ -9,9 +9,15 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, added_by, date, price, image } = body;
+    const { name, added_by, date, price, cargo_price, image } = body;
 
-    if (!name?.trim() || !added_by?.trim() || !date?.trim() || !price?.trim()) {
+    if (
+      !name?.trim() ||
+      !added_by?.trim() ||
+      !date?.trim() ||
+      !price?.trim() ||
+      !cargo_price?.trim()
+    ) {
       return NextResponse.json(
         { error: "Бүх талбарыг бөглөнө үү" },
         { status: 400 }
@@ -23,6 +29,7 @@ export async function POST(request: Request) {
       added_by: added_by.trim(),
       date: date.trim(),
       price: price.trim(),
+      cargo_price: cargo_price.trim(),
       image: image || null,
     });
 

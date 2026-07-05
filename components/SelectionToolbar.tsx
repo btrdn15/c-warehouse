@@ -4,33 +4,52 @@ import { useState } from "react";
 import type { ProductStatus } from "@/lib/types";
 import StatusPickerSheet from "@/components/StatusPickerSheet";
 import ReceiveModal from "@/components/ReceiveModal";
+import ArrivalDateModal from "@/components/ArrivalDateModal";
 
 interface SelectionToolbarProps {
   selectionMode: boolean;
   selectedCount: number;
+  totalCount: number;
+  allSelected: boolean;
   onToggleSelectionMode: () => void;
-  onBulkStatusChange: (status: ProductStatus) => void;
-  onBulkReceive: (receivedBy: string) => void;
+  onSelectAll: () => void;
+  onBulkStatusChange: (status: ProductStatus, arrivedDate?: string) => void;
+  onBulkReceive: (receivedBy: string, receivedDate: string) => void;
+  onDownload: () => void;
 }
 
 export default function SelectionToolbar({
   selectionMode,
   selectedCount,
+  totalCount,
+  allSelected,
   onToggleSelectionMode,
+  onSelectAll,
   onBulkStatusChange,
   onBulkReceive,
+  onDownload,
 }: SelectionToolbarProps) {
   const [statusPickerOpen, setStatusPickerOpen] = useState(false);
   const [receiveModalOpen, setReceiveModalOpen] = useState(false);
+  const [arrivalOpen, setArrivalOpen] = useState(false);
 
   function handleStatusSelect(status: ProductStatus) {
     setStatusPickerOpen(false);
+    if (status === "буусан") {
+      setArrivalOpen(true);
+      return;
+    }
     onBulkStatusChange(status);
   }
 
-  function handleReceive(receivedBy: string) {
+  function handleArrivalSubmit(arrivedDate: string) {
+    setArrivalOpen(false);
+    onBulkStatusChange("буусан", arrivedDate);
+  }
+
+  function handleReceive(receivedBy: string, receivedDate: string) {
     setReceiveModalOpen(false);
-    onBulkReceive(receivedBy);
+    onBulkReceive(receivedBy, receivedDate);
   }
 
   return (
@@ -50,6 +69,15 @@ export default function SelectionToolbar({
 
         {selectionMode && (
           <>
+            <span className="text-gray-300">|</span>
+            <button
+              type="button"
+              onClick={onSelectAll}
+              disabled={totalCount === 0}
+              className="text-sm font-medium text-gray-700 transition-colors hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {allSelected ? "Бүгдийг цуцлах" : "Бүгдийг сонгох"}
+            </button>
             <span className="text-gray-300">|</span>
             <button
               type="button"
@@ -74,6 +102,18 @@ export default function SelectionToolbar({
                 <span className="ml-1 text-blue-600">({selectedCount})</span>
               )}
             </button>
+            <span className="text-gray-300">|</span>
+            <button
+              type="button"
+              onClick={onDownload}
+              disabled={selectedCount === 0}
+              className="text-sm font-medium text-gray-700 transition-colors hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Татах
+              {selectedCount > 0 && (
+                <span className="ml-1 text-blue-600">({selectedCount})</span>
+              )}
+            </button>
           </>
         )}
       </div>
@@ -94,6 +134,14 @@ export default function SelectionToolbar({
           count={selectedCount}
           onClose={() => setReceiveModalOpen(false)}
           onSubmit={handleReceive}
+        />
+      )}
+
+      {arrivalOpen && (
+        <ArrivalDateModal
+          title={`${selectedCount} бараа Монголд буусан огноо`}
+          onClose={() => setArrivalOpen(false)}
+          onSubmit={handleArrivalSubmit}
         />
       )}
     </>

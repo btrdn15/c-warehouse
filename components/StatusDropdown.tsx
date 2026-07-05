@@ -4,11 +4,12 @@ import { useState } from "react";
 import type { ProductStatus } from "@/lib/types";
 import { STATUS_COLORS } from "@/lib/types";
 import StatusPickerSheet from "@/components/StatusPickerSheet";
+import ArrivalDateModal from "@/components/ArrivalDateModal";
 
 interface StatusDropdownProps {
   status: ProductStatus;
   fullWidth?: boolean;
-  onChange: (status: ProductStatus) => void;
+  onChange: (status: ProductStatus, arrivedDate?: string) => void;
 }
 
 export default function StatusDropdown({
@@ -17,12 +18,23 @@ export default function StatusDropdown({
   onChange,
 }: StatusDropdownProps) {
   const [open, setOpen] = useState(false);
+  const [arrivalOpen, setArrivalOpen] = useState(false);
 
   function handleSelect(newStatus: ProductStatus) {
     setOpen(false);
-    if (newStatus !== status) {
-      onChange(newStatus);
+    if (newStatus === status) return;
+
+    if (newStatus === "буусан") {
+      setArrivalOpen(true);
+      return;
     }
+
+    onChange(newStatus);
+  }
+
+  function handleArrivalSubmit(arrivedDate: string) {
+    setArrivalOpen(false);
+    onChange("буусан", arrivedDate);
   }
 
   return (
@@ -42,11 +54,7 @@ export default function StatusDropdown({
           stroke="currentColor"
           strokeWidth={2}
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M19 9l-7 7-7-7"
-          />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
 
@@ -56,6 +64,13 @@ export default function StatusDropdown({
         onSelect={handleSelect}
         currentStatus={status}
       />
+
+      {arrivalOpen && (
+        <ArrivalDateModal
+          onClose={() => setArrivalOpen(false)}
+          onSubmit={handleArrivalSubmit}
+        />
+      )}
     </>
   );
 }

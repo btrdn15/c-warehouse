@@ -8,7 +8,7 @@ interface ProductListProps {
   selectionMode: boolean;
   selectedIds: Set<number>;
   onToggleSelect: (id: number) => void;
-  onStatusChange: (id: number, status: ProductStatus) => void;
+  onStatusChange: (id: number, status: ProductStatus, arrivedDate?: string) => void;
 }
 
 function Checkbox({
@@ -71,6 +71,11 @@ function ProductNameCell({ product, selected }: { product: Product; selected?: b
         {product.price && (
           <p className="mt-0.5 text-sm text-gray-600">Үнэ: {product.price}</p>
         )}
+        {product.cargo_price && (
+          <p className="mt-0.5 text-sm text-gray-600">
+            Каргоны үнэ: {product.cargo_price}
+          </p>
+        )}
         {selected && (
           <span className="mt-1 inline-block rounded-full bg-blue-600 px-2 py-0.5 text-xs font-medium text-white">
             Сонгогдсон
@@ -88,6 +93,9 @@ function AddedByCell({ product }: { product: Product }) {
       {product.received_by && (
         <div className="mt-0.5 text-xs text-gray-500">
           Хүлээн авсан: {product.received_by}
+          {product.received_date && (
+            <span className="text-gray-400"> · {product.received_date}</span>
+          )}
         </div>
       )}
     </div>
@@ -115,7 +123,7 @@ export default function ProductList({
     <>
       {/* Mobile: card list */}
       <div className="space-y-3 md:hidden">
-        {products.map((product, index) => {
+        {products.map((product) => {
           const selected = selectedIds.has(product.id);
           return (
             <div
@@ -136,7 +144,7 @@ export default function ProductList({
                 )}
                 <div className="min-w-0 flex-1">
                   <span className="text-xs font-medium text-gray-400">
-                    №{index + 1}
+                    №{product.product_no}
                   </span>
                   <div className="mt-1">
                     <ProductNameCell product={product} selected={selected} />
@@ -154,15 +162,26 @@ export default function ProductList({
                     {product.received_by && (
                       <p className="mt-0.5 text-xs text-gray-500">
                         Хүлээн авсан: {product.received_by}
+                        {product.received_date && (
+                          <span className="text-gray-400">
+                            {" "}
+                            · {product.received_date}
+                          </span>
+                        )}
                       </p>
                     )}
                   </div>
                 </div>
                 <div className="flex gap-2">
                   <span className="shrink-0 text-gray-500">Огноо:</span>
-                  <span className="break-words text-gray-800">
-                    {product.date}
-                  </span>
+                  <div>
+                    <span className="break-words text-gray-800">{product.date}</span>
+                    {product.arrived_date && (
+                      <p className="mt-0.5 text-xs text-green-700">
+                        Монголд буусан: {product.arrived_date}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -170,7 +189,9 @@ export default function ProductList({
                 <StatusDropdown
                   status={product.status}
                   fullWidth
-                  onChange={(status) => onStatusChange(product.id, status)}
+                  onChange={(status, arrivedDate) =>
+                            onStatusChange(product.id, status, arrivedDate)
+                          }
                 />
               )}
             </div>
@@ -206,7 +227,7 @@ export default function ProductList({
             </tr>
           </thead>
           <tbody>
-            {products.map((product, index) => {
+            {products.map((product) => {
               const selected = selectedIds.has(product.id);
               return (
                 <tr
@@ -230,8 +251,8 @@ export default function ProductList({
                       />
                     </td>
                   )}
-                  <td className="whitespace-nowrap px-4 py-4 align-middle text-gray-400">
-                    {index + 1}
+                  <td className="whitespace-nowrap px-4 py-4 align-middle font-mono text-gray-700">
+                    {product.product_no}
                   </td>
                   <td className="px-4 py-4 align-middle">
                     <ProductNameCell product={product} selected={selected} />
@@ -239,15 +260,20 @@ export default function ProductList({
                   <td className="px-4 py-4 align-middle">
                     <AddedByCell product={product} />
                   </td>
-                  <td className="whitespace-nowrap px-4 py-4 align-middle text-gray-700">
-                    {product.date}
+                  <td className="px-4 py-4 align-middle text-gray-700">
+                    <div>{product.date}</div>
+                    {product.arrived_date && (
+                      <div className="mt-0.5 text-xs text-green-700">
+                        Монголд буусан: {product.arrived_date}
+                      </div>
+                    )}
                   </td>
                   {!selectionMode && (
                     <td className="whitespace-nowrap px-4 py-4 align-middle">
                       <StatusDropdown
                         status={product.status}
-                        onChange={(status) =>
-                          onStatusChange(product.id, status)
+                        onChange={(status, arrivedDate) =>
+                          onStatusChange(product.id, status, arrivedDate)
                         }
                       />
                     </td>

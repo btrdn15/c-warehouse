@@ -10,13 +10,17 @@ const DB_PATH = path.join(DATA_DIR, "warehouse.db");
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_no TEXT UNIQUE,
     name TEXT NOT NULL,
     added_by TEXT NOT NULL,
     date TEXT NOT NULL,
     price TEXT,
+    cargo_price TEXT,
     image TEXT,
     status TEXT NOT NULL DEFAULT 'ачигдаагүй',
     received_by TEXT,
+    received_date TEXT,
+    arrived_date TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )
 `;
@@ -25,7 +29,104 @@ const MIGRATIONS = [
   { column: "received_by", sql: "ALTER TABLE products ADD COLUMN received_by TEXT" },
   { column: "price", sql: "ALTER TABLE products ADD COLUMN price TEXT" },
   { column: "image", sql: "ALTER TABLE products ADD COLUMN image TEXT" },
+  { column: "arrived_date", sql: "ALTER TABLE products ADD COLUMN arrived_date TEXT" },
+  { column: "cargo_price", sql: "ALTER TABLE products ADD COLUMN cargo_price TEXT" },
+  { column: "received_date", sql: "ALTER TABLE products ADD COLUMN received_date TEXT" },
+  { column: "product_no", sql: "ALTER TABLE products ADD COLUMN product_no TEXT" },
 ];
+
+function randomProductNo(): string {
+  const num = Math.floor(Math.random() * 9999) + 1;
+  return String(num).padStart(4, "0");
+}
+
+function backfillProductNumbersSqlite(db: Database.Database): void {
+  const missing = db
+    .prepare("SELECT id FROM products WHERE product_no IS NULL ORDER BY id ASC")
+    .all() as { id: number }[];
+  if (missing.length === 0) return;
+
+  const used = new Set(
+    (
+      db
+        .prepare("SELECT product_no FROM products WHERE product_no IS NOT NULL")
+        .all() as { product_no: string }[]
+    ).map((row) => row.product_no)
+  );
+
+  const update = db.prepare("UPDATE products SET product_no = ? WHERE id = ?");
+  for (const row of missing) {
+    let productNo: string;
+    do {
+      productNo = randomProductNo();
+    } while (used.has(productNo));
+    used.add(productNo);
+    update.run(productNo, row.id);
+  }
+}
+
+function generateProductNoSqlite(db: Database.Database): string {
+  const used = new Set(
+    (
+      db.prepare("SELECT product_no FROM products").all() as {
+        product_no: string | null;
+      }[]
+    )
+      .map((row) => row.product_no)
+      .filter((value): value is string => Boolean(value))
+  );
+
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const productNo = randomProductNo();
+    if (!used.has(productNo)) return productNo;
+  }
+
+  throw new Error("Барааны дугаар дууссан");
+}
+
+async function backfillProductNumbersTurso(client: Client): Promise<void> {
+  const missing = await client.execute(
+    "SELECT id FROM products WHERE product_no IS NULL ORDER BY id ASC"
+  );
+  if (missing.rows.length === 0) return;
+
+  const existing = await client.execute(
+    "SELECT product_no FROM products WHERE product_no IS NOT NULL"
+  );
+  const used = new Set(
+    existing.rows.map((row) => String(row.product_no ?? row[0] ?? ""))
+  );
+
+  for (const row of missing.rows) {
+    const id = Number(row.id ?? row[0]);
+    let productNo: string;
+    do {
+      productNo = randomProductNo();
+    } while (used.has(productNo));
+    used.add(productNo);
+    await client.execute({
+      sql: "UPDATE products SET product_no = ? WHERE id = ?",
+      args: [productNo, id],
+    });
+  }
+}
+
+async function generateProductNoTurso(client: Client): Promise<string> {
+  const existing = await client.execute("SELECT product_no FROM products");
+  const used = new Set(
+    existing.rows
+      .map((row) => row.product_no ?? row[0])
+      .filter((value) => value != null)
+      .map(String)
+  );
+
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const productNo = randomProductNo();
+    if (!used.has(productNo)) return productNo;
+  }
+
+  throw new Error("Барааны дугаар дууссан");
+}
 
 let sqliteDb: Database.Database | null = null;
 let tursoClient: Client | null = null;
@@ -52,6 +153,10 @@ function getSqliteDb(): Database.Database {
         sqliteDb.exec(migration.sql);
       }
     }
+    sqliteDb.exec(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_products_product_no ON products(product_no)"
+    );
+    backfillProductNumbersSqlite(sqliteDb);
   }
   return sqliteDb;
 }
@@ -81,6 +186,10 @@ async function ensureSchema(): Promise<void> {
         await client.execute(migration.sql);
       }
     }
+    await client.execute(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_products_product_no ON products(product_no)"
+    );
+    await backfillProductNumbersTurso(client);
   } else {
     getSqliteDb();
   }
@@ -91,13 +200,17 @@ async function ensureSchema(): Promise<void> {
 function rowToProduct(row: Record<string, unknown>): Product {
   return {
     id: Number(row.id),
+    product_no: String(row.product_no ?? ""),
     name: String(row.name),
     added_by: String(row.added_by),
     date: String(row.date),
     price: row.price ? String(row.price) : null,
+    cargo_price: row.cargo_price ? String(row.cargo_price) : null,
     image: row.image ? String(row.image) : null,
     status: row.status as ProductStatus,
     received_by: row.received_by ? String(row.received_by) : null,
+    received_date: row.received_date ? String(row.received_date) : null,
+    arrived_date: row.arrived_date ? String(row.arrived_date) : null,
     created_at: String(row.created_at),
   };
 }
@@ -123,26 +236,47 @@ export async function createProduct(data: {
   added_by: string;
   date: string;
   price: string;
+  cargo_price: string;
   image: string | null;
 }): Promise<Product> {
   await ensureSchema();
 
   if (useTurso()) {
-    const result = await getTurso().execute({
-      sql: `INSERT INTO products (name, added_by, date, price, image, status)
-            VALUES (?, ?, ?, ?, ?, 'ачигдаагүй')
+    const client = getTurso();
+    const productNo = await generateProductNoTurso(client);
+    const result = await client.execute({
+      sql: `INSERT INTO products (product_no, name, added_by, date, price, cargo_price, image, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'ачигдаагүй')
             RETURNING *`,
-      args: [data.name, data.added_by, data.date, data.price, data.image],
+      args: [
+        productNo,
+        data.name,
+        data.added_by,
+        data.date,
+        data.price,
+        data.cargo_price,
+        data.image,
+      ],
     });
     return rowToProduct(result.rows[0] as Record<string, unknown>);
   }
 
-  const result = getSqliteDb()
+  const db = getSqliteDb();
+  const productNo = generateProductNoSqlite(db);
+  const result = db
     .prepare(
-      "INSERT INTO products (name, added_by, date, price, image, status) VALUES (?, ?, ?, ?, ?, 'ачигдаагүй')"
+      "INSERT INTO products (product_no, name, added_by, date, price, cargo_price, image, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'ачигдаагүй')"
     )
-    .run(data.name, data.added_by, data.date, data.price, data.image);
-  const product = getSqliteDb()
+    .run(
+      productNo,
+      data.name,
+      data.added_by,
+      data.date,
+      data.price,
+      data.cargo_price,
+      data.image
+    );
+  const product = db
     .prepare("SELECT * FROM products WHERE id = ?")
     .get(result.lastInsertRowid) as Product;
   return product;
@@ -150,22 +284,23 @@ export async function createProduct(data: {
 
 export async function updateProductStatus(
   id: number,
-  status: ProductStatus
+  status: ProductStatus,
+  arrivedDate?: string | null
 ): Promise<Product | null> {
   await ensureSchema();
 
   if (useTurso()) {
     const result = await getTurso().execute({
-      sql: "UPDATE products SET status = ? WHERE id = ? RETURNING *",
-      args: [status, id],
+      sql: "UPDATE products SET status = ?, arrived_date = ? WHERE id = ? RETURNING *",
+      args: [status, arrivedDate ?? null, id],
     });
     if (result.rows.length === 0) return null;
     return rowToProduct(result.rows[0] as Record<string, unknown>);
   }
 
   getSqliteDb()
-    .prepare("UPDATE products SET status = ? WHERE id = ?")
-    .run(status, id);
+    .prepare("UPDATE products SET status = ?, arrived_date = ? WHERE id = ?")
+    .run(status, arrivedDate ?? null, id);
   const product = getSqliteDb()
     .prepare("SELECT * FROM products WHERE id = ?")
     .get(id) as Product | undefined;
@@ -174,7 +309,8 @@ export async function updateProductStatus(
 
 export async function updateBulkProductStatus(
   ids: number[],
-  status: ProductStatus
+  status: ProductStatus,
+  arrivedDate?: string | null
 ): Promise<Product[]> {
   if (ids.length === 0) return [];
   await ensureSchema();
@@ -182,8 +318,8 @@ export async function updateBulkProductStatus(
   if (useTurso()) {
     const placeholders = ids.map(() => "?").join(", ");
     await getTurso().execute({
-      sql: `UPDATE products SET status = ? WHERE id IN (${placeholders})`,
-      args: [status, ...ids],
+      sql: `UPDATE products SET status = ?, arrived_date = ? WHERE id IN (${placeholders})`,
+      args: [status, arrivedDate ?? null, ...ids],
     });
     const selectPlaceholders = ids.map(() => "?").join(", ");
     const result = await getTurso().execute({
@@ -197,8 +333,8 @@ export async function updateBulkProductStatus(
 
   const placeholders = ids.map(() => "?").join(", ");
   getSqliteDb()
-    .prepare(`UPDATE products SET status = ? WHERE id IN (${placeholders})`)
-    .run(status, ...ids);
+    .prepare(`UPDATE products SET status = ?, arrived_date = ? WHERE id IN (${placeholders})`)
+    .run(status, arrivedDate ?? null, ...ids);
   const selectPlaceholders = ids.map(() => "?").join(", ");
   return getSqliteDb()
     .prepare(
@@ -209,7 +345,8 @@ export async function updateBulkProductStatus(
 
 export async function updateBulkProductReceivedBy(
   ids: number[],
-  receivedBy: string
+  receivedBy: string,
+  receivedDate: string
 ): Promise<Product[]> {
   if (ids.length === 0) return [];
   await ensureSchema();
@@ -217,8 +354,8 @@ export async function updateBulkProductReceivedBy(
   if (useTurso()) {
     const placeholders = ids.map(() => "?").join(", ");
     await getTurso().execute({
-      sql: `UPDATE products SET received_by = ? WHERE id IN (${placeholders})`,
-      args: [receivedBy, ...ids],
+      sql: `UPDATE products SET received_by = ?, received_date = ? WHERE id IN (${placeholders})`,
+      args: [receivedBy, receivedDate, ...ids],
     });
     const selectPlaceholders = ids.map(() => "?").join(", ");
     const result = await getTurso().execute({
@@ -233,9 +370,9 @@ export async function updateBulkProductReceivedBy(
   const placeholders = ids.map(() => "?").join(", ");
   getSqliteDb()
     .prepare(
-      `UPDATE products SET received_by = ? WHERE id IN (${placeholders})`
+      `UPDATE products SET received_by = ?, received_date = ? WHERE id IN (${placeholders})`
     )
-    .run(receivedBy, ...ids);
+    .run(receivedBy, receivedDate, ...ids);
   const selectPlaceholders = ids.map(() => "?").join(", ");
   return getSqliteDb()
     .prepare(
