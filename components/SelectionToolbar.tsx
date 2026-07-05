@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ProductStatus } from "@/lib/types";
 import StatusPickerSheet from "@/components/StatusPickerSheet";
 import ReceiveModal from "@/components/ReceiveModal";
+import SellModal from "@/components/SellModal";
 import ArrivalDateModal from "@/components/ArrivalDateModal";
 
 interface SelectionToolbarProps {
@@ -15,6 +16,7 @@ interface SelectionToolbarProps {
   onSelectAll: () => void;
   onBulkStatusChange: (status: ProductStatus, arrivedDate?: string) => void;
   onBulkReceive: (receivedBy: string, receivedDate: string) => void;
+  onBulkSell: (soldBy: string, soldPrice: string) => void;
   onDownload: () => void;
 }
 
@@ -27,10 +29,12 @@ export default function SelectionToolbar({
   onSelectAll,
   onBulkStatusChange,
   onBulkReceive,
+  onBulkSell,
   onDownload,
 }: SelectionToolbarProps) {
   const [statusPickerOpen, setStatusPickerOpen] = useState(false);
   const [receiveModalOpen, setReceiveModalOpen] = useState(false);
+  const [sellModalOpen, setSellModalOpen] = useState(false);
   const [arrivalOpen, setArrivalOpen] = useState(false);
 
   function handleStatusSelect(status: ProductStatus) {
@@ -50,6 +54,11 @@ export default function SelectionToolbar({
   function handleReceive(receivedBy: string, receivedDate: string) {
     setReceiveModalOpen(false);
     onBulkReceive(receivedBy, receivedDate);
+  }
+
+  function handleSell(soldBy: string, soldPrice: string) {
+    setSellModalOpen(false);
+    onBulkSell(soldBy, soldPrice);
   }
 
   return (
@@ -105,6 +114,18 @@ export default function SelectionToolbar({
             <span className="text-gray-300">|</span>
             <button
               type="button"
+              onClick={() => setSellModalOpen(true)}
+              disabled={selectedCount === 0}
+              className="text-sm font-medium text-gray-700 transition-colors hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Зарах
+              {selectedCount > 0 && (
+                <span className="ml-1 text-blue-600">({selectedCount})</span>
+              )}
+            </button>
+            <span className="text-gray-300">|</span>
+            <button
+              type="button"
               onClick={onDownload}
               disabled={selectedCount === 0}
               className="text-sm font-medium text-gray-700 transition-colors hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
@@ -134,6 +155,14 @@ export default function SelectionToolbar({
           count={selectedCount}
           onClose={() => setReceiveModalOpen(false)}
           onSubmit={handleReceive}
+        />
+      )}
+
+      {sellModalOpen && (
+        <SellModal
+          count={selectedCount}
+          onClose={() => setSellModalOpen(false)}
+          onSubmit={handleSell}
         />
       )}
 

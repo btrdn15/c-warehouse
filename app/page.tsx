@@ -156,6 +156,25 @@ export default function HomePage() {
     }
   }
 
+  async function handleBulkSell(soldBy: string, soldPrice: string) {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    const res = await fetch("/api/products/sell", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, sold_by: soldBy, sold_price: soldPrice }),
+    });
+
+    if (res.ok) {
+      const updated = (await res.json()) as Product[];
+      const updatedMap = new Map(updated.map((p) => [p.id, p]));
+      setProducts((prev) => prev.map((p) => updatedMap.get(p.id) ?? p));
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+    }
+  }
+
   function handleDownload() {
     const selected = products.filter((product) => selectedIds.has(product.id));
     downloadProductsExcel(selected);
@@ -201,6 +220,7 @@ export default function HomePage() {
               onSelectAll={toggleSelectAll}
               onBulkStatusChange={handleBulkStatusChange}
               onBulkReceive={handleBulkReceive}
+              onBulkSell={handleBulkSell}
               onDownload={handleDownload}
             />
             {filteredProducts.length === 0 ? (

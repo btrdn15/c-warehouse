@@ -76,6 +76,14 @@ function ProductNameCell({ product, selected }: { product: Product; selected?: b
             Каргоны үнэ: {product.cargo_price}
           </p>
         )}
+        {product.sold_by && (
+          <p className="mt-0.5 text-sm text-purple-700">
+            Зарсан: {product.sold_by}
+            {product.sold_price && (
+              <span className="text-purple-600"> · {product.sold_price}₮</span>
+            )}
+          </p>
+        )}
         {selected && (
           <span className="mt-1 inline-block rounded-full bg-blue-600 px-2 py-0.5 text-xs font-medium text-white">
             Сонгогдсон

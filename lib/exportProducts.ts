@@ -15,6 +15,8 @@ export function downloadProductsExcel(products: Product[]) {
     "Хүлээн авсан": product.received_by ?? "",
     "Хүлээн авсан огноо": product.received_date ?? "",
     "Монголд буусан": product.arrived_date ?? "",
+    "Зарсан хүн": product.sold_by ?? "",
+    "Хэдээр зарсан": product.sold_price ?? "",
   }));
 
   const worksheet = XLSX.utils.json_to_sheet(rows);

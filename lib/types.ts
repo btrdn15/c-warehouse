@@ -17,6 +17,8 @@ export interface Product {
   received_by: string | null;
   received_date: string | null;
   arrived_date: string | null;
+  sold_by: string | null;
+  sold_price: string | null;
   created_at: string;
 }
 

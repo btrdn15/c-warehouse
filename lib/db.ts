@@ -21,6 +21,8 @@ const SCHEMA = `
     received_by TEXT,
     received_date TEXT,
     arrived_date TEXT,
+    sold_by TEXT,
+    sold_price TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )
 `;
@@ -33,6 +35,8 @@ const MIGRATIONS = [
   { column: "cargo_price", sql: "ALTER TABLE products ADD COLUMN cargo_price TEXT" },
   { column: "received_date", sql: "ALTER TABLE products ADD COLUMN received_date TEXT" },
   { column: "product_no", sql: "ALTER TABLE products ADD COLUMN product_no TEXT" },
+  { column: "sold_by", sql: "ALTER TABLE products ADD COLUMN sold_by TEXT" },
+  { column: "sold_price", sql: "ALTER TABLE products ADD COLUMN sold_price TEXT" },
 ];
 
 function randomProductNo(): string {
@@ -211,6 +215,8 @@ function rowToProduct(row: Record<string, unknown>): Product {
     received_by: row.received_by ? String(row.received_by) : null,
     received_date: row.received_date ? String(row.received_date) : null,
     arrived_date: row.arrived_date ? String(row.arrived_date) : null,
+    sold_by: row.sold_by ? String(row.sold_by) : null,
+    sold_price: row.sold_price ? String(row.sold_price) : null,
     created_at: String(row.created_at),
   };
 }
@@ -373,6 +379,44 @@ export async function updateBulkProductReceivedBy(
       `UPDATE products SET received_by = ?, received_date = ? WHERE id IN (${placeholders})`
     )
     .run(receivedBy, receivedDate, ...ids);
+  const selectPlaceholders = ids.map(() => "?").join(", ");
+  return getSqliteDb()
+    .prepare(
+      `SELECT * FROM products WHERE id IN (${selectPlaceholders}) ORDER BY created_at ASC`
+    )
+    .all(...ids) as Product[];
+}
+
+export async function updateBulkProductSold(
+  ids: number[],
+  soldBy: string,
+  soldPrice: string
+): Promise<Product[]> {
+  if (ids.length === 0) return [];
+  await ensureSchema();
+
+  if (useTurso()) {
+    const placeholders = ids.map(() => "?").join(", ");
+    await getTurso().execute({
+      sql: `UPDATE products SET sold_by = ?, sold_price = ? WHERE id IN (${placeholders})`,
+      args: [soldBy, soldPrice, ...ids],
+    });
+    const selectPlaceholders = ids.map(() => "?").join(", ");
+    const result = await getTurso().execute({
+      sql: `SELECT * FROM products WHERE id IN (${selectPlaceholders}) ORDER BY created_at ASC`,
+      args: ids,
+    });
+    return result.rows.map((row) =>
+      rowToProduct(row as Record<string, unknown>)
+    );
+  }
+
+  const placeholders = ids.map(() => "?").join(", ");
+  getSqliteDb()
+    .prepare(
+      `UPDATE products SET sold_by = ?, sold_price = ? WHERE id IN (${placeholders})`
+    )
+    .run(soldBy, soldPrice, ...ids);
   const selectPlaceholders = ids.map(() => "?").join(", ");
   return getSqliteDb()
     .prepare(
