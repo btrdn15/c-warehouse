@@ -7,7 +7,7 @@ import ProductList from "@/components/ProductList";
 import SearchBar from "@/components/SearchBar";
 import SelectionToolbar from "@/components/SelectionToolbar";
 import { getDefaultMonthValue } from "@/lib/date";
-import { downloadProductsExcel } from "@/lib/exportProducts";
+import { downloadBlob, downloadProductsExcel } from "@/lib/exportProducts";
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -175,9 +175,30 @@ export default function HomePage() {
     }
   }
 
-  function handleDownload() {
-    const selected = products.filter((product) => selectedIds.has(product.id));
-    downloadProductsExcel(selected);
+  async function handleDownload() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    const date = new Date().toISOString().slice(0, 10);
+    const filename = `baraa-${date}.xlsx`;
+
+    try {
+      const res = await fetch("/api/products/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Export failed");
+      }
+
+      const blob = await res.blob();
+      downloadBlob(blob, filename);
+    } catch {
+      const selected = products.filter((product) => selectedIds.has(product.id));
+      downloadProductsExcel(selected);
+    }
   }
 
   return (
