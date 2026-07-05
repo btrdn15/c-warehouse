@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: c-warehouse
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SITE_PASSWORD
+        sync: false
