@@ -23,7 +23,7 @@ export async function PATCH(
       );
     }
 
-    const product = updateProductStatus(productId, status);
+    const product = await updateProductStatus(productId, status);
     if (!product) {
       return NextResponse.json(
         { error: "Бараа олдсонгүй" },

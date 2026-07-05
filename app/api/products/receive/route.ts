@@ -28,7 +28,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Буруу ID" }, { status: 400 });
     }
 
-    const products = updateBulkProductReceivedBy(validIds, received_by.trim());
+    const products = await updateBulkProductReceivedBy(validIds, received_by.trim());
     return NextResponse.json(products);
   } catch {
     return NextResponse.json(

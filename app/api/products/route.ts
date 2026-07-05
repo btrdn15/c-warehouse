@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createProduct, getAllProducts } from "@/lib/db";
 
 export async function GET() {
-  const products = getAllProducts();
+  const products = await getAllProducts();
   return NextResponse.json(products);
 }
 
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const product = createProduct({
+    const product = await createProduct({
       name: name.trim(),
       added_by: added_by.trim(),
       date: date.trim(),

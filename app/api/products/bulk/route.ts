@@ -26,7 +26,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Буруу ID" }, { status: 400 });
     }
 
-    const products = updateBulkProductStatus(validIds, status);
+    const products = await updateBulkProductStatus(validIds, status);
     return NextResponse.json(products);
   } catch {
     return NextResponse.json(
