@@ -9,6 +9,8 @@ export interface Product {
   name: string;
   added_by: string;
   date: string;
+  price: string | null;
+  image: string | null;
   status: ProductStatus;
   received_by: string | null;
   created_at: string;

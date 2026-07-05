@@ -5,7 +5,7 @@ import type { Product, ProductStatus } from "@/lib/types";
 import AddProductModal from "@/components/AddProductModal";
 import ProductList from "@/components/ProductList";
 import SelectionToolbar from "@/components/SelectionToolbar";
-import { formatYearMonth } from "@/lib/date";
+import { getDefaultMonthValue } from "@/lib/date";
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -45,6 +45,8 @@ export default function HomePage() {
     name: string;
     added_by: string;
     date: string;
+    price: string;
+    image: string | null;
   }) {
     const res = await fetch("/api/products", {
       method: "POST",
@@ -177,7 +179,7 @@ export default function HomePage() {
 
       {showModal && (
         <AddProductModal
-          defaultDate={formatYearMonth(new Date())}
+          defaultDate={getDefaultMonthValue()}
           onClose={() => setShowModal(false)}
           onSubmit={handleAddProduct}
         />

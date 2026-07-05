@@ -13,11 +13,19 @@ const SCHEMA = `
     name TEXT NOT NULL,
     added_by TEXT NOT NULL,
     date TEXT NOT NULL,
+    price TEXT,
+    image TEXT,
     status TEXT NOT NULL DEFAULT 'ачигдаагүй',
     received_by TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )
 `;
+
+const MIGRATIONS = [
+  { column: "received_by", sql: "ALTER TABLE products ADD COLUMN received_by TEXT" },
+  { column: "price", sql: "ALTER TABLE products ADD COLUMN price TEXT" },
+  { column: "image", sql: "ALTER TABLE products ADD COLUMN image TEXT" },
+];
 
 let sqliteDb: Database.Database | null = null;
 let tursoClient: Client | null = null;
@@ -39,8 +47,10 @@ function getSqliteDb(): Database.Database {
     const columns = sqliteDb
       .prepare("PRAGMA table_info(products)")
       .all() as { name: string }[];
-    if (!columns.some((col) => col.name === "received_by")) {
-      sqliteDb.exec("ALTER TABLE products ADD COLUMN received_by TEXT");
+    for (const migration of MIGRATIONS) {
+      if (!columns.some((col) => col.name === migration.column)) {
+        sqliteDb.exec(migration.sql);
+      }
     }
   }
   return sqliteDb;
@@ -63,13 +73,13 @@ async function ensureSchema(): Promise<void> {
     const client = getTurso();
     await client.execute(SCHEMA);
     const info = await client.execute("PRAGMA table_info(products)");
-    const hasReceivedBy = info.rows.some(
-      (row) => row.name === "received_by" || row[1] === "received_by"
+    const columnNames = new Set(
+      info.rows.map((row) => String(row.name ?? row[1] ?? ""))
     );
-    if (!hasReceivedBy) {
-      await client.execute(
-        "ALTER TABLE products ADD COLUMN received_by TEXT"
-      );
+    for (const migration of MIGRATIONS) {
+      if (!columnNames.has(migration.column)) {
+        await client.execute(migration.sql);
+      }
     }
   } else {
     getSqliteDb();
@@ -84,6 +94,8 @@ function rowToProduct(row: Record<string, unknown>): Product {
     name: String(row.name),
     added_by: String(row.added_by),
     date: String(row.date),
+    price: row.price ? String(row.price) : null,
+    image: row.image ? String(row.image) : null,
     status: row.status as ProductStatus,
     received_by: row.received_by ? String(row.received_by) : null,
     created_at: String(row.created_at),
@@ -110,24 +122,26 @@ export async function createProduct(data: {
   name: string;
   added_by: string;
   date: string;
+  price: string;
+  image: string | null;
 }): Promise<Product> {
   await ensureSchema();
 
   if (useTurso()) {
     const result = await getTurso().execute({
-      sql: `INSERT INTO products (name, added_by, date, status)
-            VALUES (?, ?, ?, 'ачигдаагүй')
+      sql: `INSERT INTO products (name, added_by, date, price, image, status)
+            VALUES (?, ?, ?, ?, ?, 'ачигдаагүй')
             RETURNING *`,
-      args: [data.name, data.added_by, data.date],
+      args: [data.name, data.added_by, data.date, data.price, data.image],
     });
     return rowToProduct(result.rows[0] as Record<string, unknown>);
   }
 
   const result = getSqliteDb()
     .prepare(
-      "INSERT INTO products (name, added_by, date, status) VALUES (?, ?, ?, 'ачигдаагүй')"
+      "INSERT INTO products (name, added_by, date, price, image, status) VALUES (?, ?, ?, ?, ?, 'ачигдаагүй')"
     )
-    .run(data.name, data.added_by, data.date);
+    .run(data.name, data.added_by, data.date, data.price, data.image);
   const product = getSqliteDb()
     .prepare("SELECT * FROM products WHERE id = ?")
     .get(result.lastInsertRowid) as Product;

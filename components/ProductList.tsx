@@ -51,6 +51,36 @@ function Checkbox({
   );
 }
 
+function ProductImage({ product }: { product: Product }) {
+  if (!product.image) return null;
+  return (
+    <img
+      src={product.image}
+      alt={product.name}
+      className="h-20 w-20 shrink-0 rounded-lg border border-gray-200 object-cover"
+    />
+  );
+}
+
+function ProductNameCell({ product, selected }: { product: Product; selected?: boolean }) {
+  return (
+    <div className="flex items-start gap-3">
+      <ProductImage product={product} />
+      <div className="min-w-0">
+        <span className="font-medium text-gray-900">{product.name}</span>
+        {product.price && (
+          <p className="mt-0.5 text-sm text-gray-600">Үнэ: {product.price}</p>
+        )}
+        {selected && (
+          <span className="mt-1 inline-block rounded-full bg-blue-600 px-2 py-0.5 text-xs font-medium text-white">
+            Сонгогдсон
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function AddedByCell({ product }: { product: Product }) {
   return (
     <div>
@@ -108,14 +138,9 @@ export default function ProductList({
                   <span className="text-xs font-medium text-gray-400">
                     №{index + 1}
                   </span>
-                  <p className="mt-0.5 break-words text-base font-semibold text-gray-900">
-                    {product.name}
-                  </p>
-                  {selected && (
-                    <span className="mt-1 inline-block rounded-full bg-blue-600 px-2 py-0.5 text-xs font-medium text-white">
-                      Сонгогдсон
-                    </span>
-                  )}
+                  <div className="mt-1">
+                    <ProductNameCell product={product} selected={selected} />
+                  </div>
                 </div>
               </div>
 
@@ -209,16 +234,7 @@ export default function ProductList({
                     {index + 1}
                   </td>
                   <td className="px-4 py-4 align-middle">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-gray-900">
-                        {product.name}
-                      </span>
-                      {selected && (
-                        <span className="rounded-full bg-blue-600 px-2 py-0.5 text-xs font-medium text-white">
-                          Сонгогдсон
-                        </span>
-                      )}
-                    </div>
+                    <ProductNameCell product={product} selected={selected} />
                   </td>
                   <td className="px-4 py-4 align-middle">
                     <AddedByCell product={product} />
